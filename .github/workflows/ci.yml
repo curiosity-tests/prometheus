@@ -677,13 +677,13 @@ jobs:
   fuzzing:
     uses: ./.github/workflows/fuzzing.yml
     with:
-      chalk_on: ${{ github.event_name == 'workflow_dispatch' && inputs.leg != 'baseline' }}
+      chalk_on: ${{ (github.event_name == 'workflow_dispatch' && inputs.leg != 'baseline') && 'true' || 'false' }}
       profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
     if: github.event_name == 'pull_request'
   codeql:
     uses: ./.github/workflows/codeql-analysis.yml
     with:
-      chalk_on: ${{ github.event_name == 'workflow_dispatch' && inputs.leg != 'baseline' }}
+      chalk_on: ${{ (github.event_name == 'workflow_dispatch' && inputs.leg != 'baseline') && 'true' || 'false' }}
       profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
     permissions:
       contents: read
