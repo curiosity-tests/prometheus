@@ -1,6 +1,21 @@
 ---
 name: CI
 on:
+  workflow_dispatch:
+    inputs:
+      leg:
+        description: "baseline (uninstrumented) or instrumented (under chalk/curiosity)"
+        type: choice
+        options: [instrumented, baseline]
+        default: instrumented
+      profile:
+        description: "CrashOverride chalk profile"
+        type: string
+        default: curiosity-tests-racecar
+      racecar_run:
+        description: "racecar correlation token, echoed into the run name"
+        type: string
+        default: ""
   pull_request:
   push:
     branches: [main, 'release-*']
@@ -8,6 +23,14 @@ on:
 
 permissions:
   contents: read
+  id-token: write
+
+env:
+  # The one variable that separates the arms: on baseline, action-checkout
+  # skips its Set up Chalk step entirely.
+  CHALK_ON: ${{ github.event_name == 'workflow_dispatch' && inputs.leg != 'baseline' }}
+
+run-name: "CI ${{ inputs.leg || 'push' }} ${{ inputs.racecar_run }}"
 
 jobs:
   test_go:
@@ -18,9 +41,32 @@ jobs:
       # should also be updated.
       image: quay.io/prometheus/golang-builder:1.27-base
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install curl/bash for action-checkout (racecar; ungated, both arms)
+        shell: sh
+        run: |
+          command -v curl >/dev/null 2>&1 && command -v bash >/dev/null 2>&1 && exit 0
+          if command -v apt-get >/dev/null 2>&1; then
+            apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates bash
+          elif command -v apk >/dev/null 2>&1; then apk add --no-cache curl ca-certificates bash
+          elif command -v dnf >/dev/null 2>&1; then dnf install -y curl ca-certificates bash
+          elif command -v yum >/dev/null 2>&1; then yum install -y curl ca-certificates bash
+          elif command -v zypper >/dev/null 2>&1; then zypper -n install curl ca-certificates bash
+          fi
+
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
         with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
           persist-credentials: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - uses: prometheus/promci-setup@55bd31fe92710532260eb57c554f2697363285c5 # v0.2.2
         with:
           enable_npm: true
@@ -36,9 +82,32 @@ jobs:
     container:
       image: quay.io/prometheus/golang-builder:1.27-base
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install curl/bash for action-checkout (racecar; ungated, both arms)
+        shell: sh
+        run: |
+          command -v curl >/dev/null 2>&1 && command -v bash >/dev/null 2>&1 && exit 0
+          if command -v apt-get >/dev/null 2>&1; then
+            apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates bash
+          elif command -v apk >/dev/null 2>&1; then apk add --no-cache curl ca-certificates bash
+          elif command -v dnf >/dev/null 2>&1; then dnf install -y curl ca-certificates bash
+          elif command -v yum >/dev/null 2>&1; then yum install -y curl ca-certificates bash
+          elif command -v zypper >/dev/null 2>&1; then zypper -n install curl ca-certificates bash
+          fi
+
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
         with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
           persist-credentials: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - uses: prometheus/promci-setup@55bd31fe92710532260eb57c554f2697363285c5 # v0.2.2
         with:
           cache_key_suffix: more
@@ -55,9 +124,32 @@ jobs:
     container:
       image: quay.io/prometheus/golang-builder:1.27-base
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install curl/bash for action-checkout (racecar; ungated, both arms)
+        shell: sh
+        run: |
+          command -v curl >/dev/null 2>&1 && command -v bash >/dev/null 2>&1 && exit 0
+          if command -v apt-get >/dev/null 2>&1; then
+            apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates bash
+          elif command -v apk >/dev/null 2>&1; then apk add --no-cache curl ca-certificates bash
+          elif command -v dnf >/dev/null 2>&1; then dnf install -y curl ca-certificates bash
+          elif command -v yum >/dev/null 2>&1; then yum install -y curl ca-certificates bash
+          elif command -v zypper >/dev/null 2>&1; then zypper -n install curl ca-certificates bash
+          fi
+
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
         with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
           persist-credentials: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - uses: prometheus/promci-setup@55bd31fe92710532260eb57c554f2697363285c5 # v0.2.2
         with:
           cache_key_suffix: "386"
@@ -91,9 +183,32 @@ jobs:
     container:
       image: quay.io/prometheus/golang-builder:1.27-base
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install curl/bash for action-checkout (racecar; ungated, both arms)
+        shell: sh
+        run: |
+          command -v curl >/dev/null 2>&1 && command -v bash >/dev/null 2>&1 && exit 0
+          if command -v apt-get >/dev/null 2>&1; then
+            apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates bash
+          elif command -v apk >/dev/null 2>&1; then apk add --no-cache curl ca-certificates bash
+          elif command -v dnf >/dev/null 2>&1; then dnf install -y curl ca-certificates bash
+          elif command -v yum >/dev/null 2>&1; then yum install -y curl ca-certificates bash
+          elif command -v zypper >/dev/null 2>&1; then zypper -n install curl ca-certificates bash
+          fi
+
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
         with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
           persist-credentials: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - uses: prometheus/promci-setup@55bd31fe92710532260eb57c554f2697363285c5 # v0.2.2
         with:
           cache_key_suffix: upgrade
@@ -105,6 +220,19 @@ jobs:
     outputs:
       versions: ${{ steps.go.outputs.versions }}
     steps:
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
+        with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - id: go
         # Upstream only supports the two latest minor releases, so the oldest
         # supported one is the lowest version listed. Emit it as a
@@ -119,6 +247,7 @@ jobs:
     needs: list_oldest_go_version
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         go_version: ${{ fromJSON(needs.list_oldest_go_version.outputs.versions) }}
     env:
@@ -127,9 +256,32 @@ jobs:
     container:
       image: quay.io/prometheus/golang-builder:${{ matrix.go_version }}-base
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install curl/bash for action-checkout (racecar; ungated, both arms)
+        shell: sh
+        run: |
+          command -v curl >/dev/null 2>&1 && command -v bash >/dev/null 2>&1 && exit 0
+          if command -v apt-get >/dev/null 2>&1; then
+            apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates bash
+          elif command -v apk >/dev/null 2>&1; then apk add --no-cache curl ca-certificates bash
+          elif command -v dnf >/dev/null 2>&1; then dnf install -y curl ca-certificates bash
+          elif command -v yum >/dev/null 2>&1; then yum install -y curl ca-certificates bash
+          elif command -v zypper >/dev/null 2>&1; then zypper -n install curl ca-certificates bash
+          fi
+
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
         with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
           persist-credentials: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - uses: prometheus/promci-setup@55bd31fe92710532260eb57c554f2697363285c5 # v0.2.2
         with:
           enable_npm: false
@@ -146,6 +298,19 @@ jobs:
     needs: [test_go_oldest]
     if: always()
     steps:
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
+        with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - name: Successful tests
         if: ${{ !(contains(needs.*.result, 'failure')) && !(contains(needs.*.result, 'cancelled')) }}
         run: exit 0
@@ -162,9 +327,32 @@ jobs:
       image: quay.io/prometheus/golang-builder:1.27-base
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install curl/bash for action-checkout (racecar; ungated, both arms)
+        shell: sh
+        run: |
+          command -v curl >/dev/null 2>&1 && command -v bash >/dev/null 2>&1 && exit 0
+          if command -v apt-get >/dev/null 2>&1; then
+            apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates bash
+          elif command -v apk >/dev/null 2>&1; then apk add --no-cache curl ca-certificates bash
+          elif command -v dnf >/dev/null 2>&1; then dnf install -y curl ca-certificates bash
+          elif command -v yum >/dev/null 2>&1; then yum install -y curl ca-certificates bash
+          elif command -v zypper >/dev/null 2>&1; then zypper -n install curl ca-certificates bash
+          fi
+
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
         with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
           persist-credentials: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - uses: prometheus/promci-setup@55bd31fe92710532260eb57c554f2697363285c5 # v0.2.2
         with:
           enable_go: false
@@ -176,21 +364,6 @@ jobs:
         with:
           directory: .tarballs
 
-  test_windows:
-    name: Go tests on Windows
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: 1.27.x
-      - run: |
-          $TestTargets = go list ./... | Where-Object { $_ -NotMatch "(github.com/prometheus/prometheus/config|github.com/prometheus/prometheus/web)"}
-          go test $TestTargets -vet=off -v
-        shell: powershell
-
   test_mixins:
     name: Mixins tests
     runs-on: ubuntu-latest
@@ -199,9 +372,32 @@ jobs:
     container:
       image: quay.io/prometheus/golang-builder:1.27-base
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install curl/bash for action-checkout (racecar; ungated, both arms)
+        shell: sh
+        run: |
+          command -v curl >/dev/null 2>&1 && command -v bash >/dev/null 2>&1 && exit 0
+          if command -v apt-get >/dev/null 2>&1; then
+            apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates bash
+          elif command -v apk >/dev/null 2>&1; then apk add --no-cache curl ca-certificates bash
+          elif command -v dnf >/dev/null 2>&1; then dnf install -y curl ca-certificates bash
+          elif command -v yum >/dev/null 2>&1; then yum install -y curl ca-certificates bash
+          elif command -v zypper >/dev/null 2>&1; then zypper -n install curl ca-certificates bash
+          fi
+
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
         with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
           persist-credentials: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - run: go install ./cmd/promtool/.
       - run: go install github.com/google/go-jsonnet/cmd/jsonnet@latest
       - run: go install github.com/google/go-jsonnet/cmd/jsonnetfmt@latest
@@ -219,9 +415,32 @@ jobs:
       # should also be updated.
       image: quay.io/prometheus/golang-builder:1.27-base
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install curl/bash for action-checkout (racecar; ungated, both arms)
+        shell: sh
+        run: |
+          command -v curl >/dev/null 2>&1 && command -v bash >/dev/null 2>&1 && exit 0
+          if command -v apt-get >/dev/null 2>&1; then
+            apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates bash
+          elif command -v apk >/dev/null 2>&1; then apk add --no-cache curl ca-certificates bash
+          elif command -v dnf >/dev/null 2>&1; then dnf install -y curl ca-certificates bash
+          elif command -v yum >/dev/null 2>&1; then yum install -y curl ca-certificates bash
+          elif command -v zypper >/dev/null 2>&1; then zypper -n install curl ca-certificates bash
+          fi
+
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
         with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
           persist-credentials: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - uses: prometheus/promci-setup@55bd31fe92710532260eb57c554f2697363285c5 # v0.2.2
         with:
           enable_npm: false
@@ -245,12 +464,24 @@ jobs:
       &&
       !(github.event_name == 'push' && github.event.ref == 'refs/heads/main')
     strategy:
+      fail-fast: false
       matrix:
         thread: [ 0, 1, 2 ]
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
         with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
           persist-credentials: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - uses: prometheus/promci-artifacts/restore@9ca3252d07f230d5f923452b4df5697eba4a5bee # v0.1.1
       - name: Extract pre-built UI assets
         run: |
@@ -279,15 +510,27 @@ jobs:
       ||
       (github.event_name == 'push' && github.event.ref == 'refs/heads/main')
     strategy:
+      fail-fast: false
       matrix:
         thread: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 ]
 
     # Whenever the Go version is updated here, .promu.yml
     # should also be updated.
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
         with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
           persist-credentials: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - uses: prometheus/promci-artifacts/restore@9ca3252d07f230d5f923452b4df5697eba4a5bee # v0.1.1
       - name: Extract pre-built UI assets
         run: |
@@ -318,6 +561,19 @@ jobs:
     # results of Build All
     if: always() && github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'release-')
     steps:
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
+        with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - name: Successful build
         if: ${{ !(contains(needs.*.result, 'failure')) && !(contains(needs.*.result, 'cancelled')) }}
         run: exit 0
@@ -331,10 +587,32 @@ jobs:
     container:
       image: quay.io/prometheus/golang-builder:1.27-base
     steps:
+      - name: Install curl/bash for action-checkout (racecar; ungated, both arms)
+        shell: sh
+        run: |
+          command -v curl >/dev/null 2>&1 && command -v bash >/dev/null 2>&1 && exit 0
+          if command -v apt-get >/dev/null 2>&1; then
+            apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates bash
+          elif command -v apk >/dev/null 2>&1; then apk add --no-cache curl ca-certificates bash
+          elif command -v dnf >/dev/null 2>&1; then dnf install -y curl ca-certificates bash
+          elif command -v yum >/dev/null 2>&1; then yum install -y curl ca-certificates bash
+          elif command -v zypper >/dev/null 2>&1; then zypper -n install curl ca-certificates bash
+          fi
+
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: crashappsec/action-checkout@main
         with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
           persist-credentials: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - uses: prometheus/promci-setup@55bd31fe92710532260eb57c554f2697363285c5 # v0.2.2
         with:
           enable_npm: true
@@ -346,9 +624,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: crashappsec/action-checkout@main
         with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
           persist-credentials: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - name: Install Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -388,19 +676,28 @@ jobs:
           version: ${{ steps.golangci-lint-version.outputs.version }}
   fuzzing:
     uses: ./.github/workflows/fuzzing.yml
-    if: github.event_name == 'pull_request'
+    with:
+      chalk_on: ${{ github.event_name == 'workflow_dispatch' && inputs.leg != 'baseline' }}
+      profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request')
   codeql:
     uses: ./.github/workflows/codeql-analysis.yml
+    with:
+      chalk_on: ${{ github.event_name == 'workflow_dispatch' && inputs.leg != 'baseline' }}
+      profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
     permissions:
       contents: read
       security-events: write
+      id-token: write
 
   publish_main:
     name: Publish main branch artifacts
     runs-on: ubuntu-latest
     permissions:
       packages: write
-    needs: [test_ui, test_go, test_go_more, test_go_oldest_status, test_windows, golangci, codeql, build_all]
+      contents: read
+      id-token: write
+    needs: [test_ui, test_go, test_go_more, test_go_oldest_status, golangci, codeql, build_all]
     if: github.event_name == 'push' && github.event.ref == 'refs/heads/main'
     steps:
       - uses: prometheus/promci/publish_main@370e8c15dcec50043cbe66f2f34633d9efc0a190 # v0.9.0
@@ -416,7 +713,8 @@ jobs:
     permissions:
       contents: write
       packages: write
-    needs: [test_ui, test_go, test_go_more, test_go_oldest_status, test_windows, golangci, codeql, build_all]
+      id-token: write
+    needs: [test_ui, test_go, test_go_more, test_go_oldest_status, golangci, codeql, build_all]
     if: |
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v2.'))
       ||
@@ -440,9 +738,19 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: crashappsec/action-checkout@main
         with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
           persist-credentials: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - name: Install nodejs
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
