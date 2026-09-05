@@ -679,7 +679,7 @@ jobs:
     with:
       chalk_on: ${{ github.event_name == 'workflow_dispatch' && inputs.leg != 'baseline' }}
       profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request')
+    if: github.event_name == 'pull_request'
   codeql:
     uses: ./.github/workflows/codeql-analysis.yml
     with:
