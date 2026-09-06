@@ -28,7 +28,7 @@ permissions:
 env:
   # The one variable that separates the arms: on baseline, action-checkout
   # skips its Set up Chalk step entirely.
-  CHALK_ON: ${{ github.event_name == 'workflow_dispatch' && inputs.leg != 'baseline' }}
+  CHALK_ON: ${{ inputs.leg == 'instrumented' }}
 
 run-name: "CI ${{ inputs.leg || 'push' }} ${{ inputs.racecar_run }}"
 
@@ -456,13 +456,13 @@ jobs:
     # every crossbuild container.
     needs: [test_ui]
     if: |
-      !(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v2.'))
+      !('push' == 'push' && startsWith(github.ref, 'refs/tags/v2.'))
       &&
-      !(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v3.'))
+      !('push' == 'push' && startsWith(github.ref, 'refs/tags/v3.'))
       &&
-      !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'release-'))
+      !('push' == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'release-'))
       &&
-      !(github.event_name == 'push' && github.event.ref == 'refs/heads/main')
+      !('push' == 'push' && github.event.ref == 'refs/heads/main')
     strategy:
       fail-fast: false
       matrix:
@@ -502,13 +502,13 @@ jobs:
     # every crossbuild container.
     needs: [test_ui]
     if: |
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v2.'))
+      ('push' == 'push' && startsWith(github.ref, 'refs/tags/v2.'))
       ||
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v3.'))
+      ('push' == 'push' && startsWith(github.ref, 'refs/tags/v3.'))
       ||
-      (github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'release-'))
+      ('push' == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'release-'))
       ||
-      (github.event_name == 'push' && github.event.ref == 'refs/heads/main')
+      ('push' == 'push' && github.event.ref == 'refs/heads/main')
     strategy:
       fail-fast: false
       matrix:
@@ -559,7 +559,7 @@ jobs:
     # And skipped is treated as success https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/collaborat[…]n-repositories-with-code-quality-features/about-status-checks
     # Adding always ensures that the status check is run independently of the
     # results of Build All
-    if: always() && github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'release-')
+    if: always() && 'push' == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'release-')
     steps:
       - name: Checkout code
         uses: crashappsec/action-checkout@main
@@ -677,13 +677,13 @@ jobs:
   fuzzing:
     uses: ./.github/workflows/fuzzing.yml
     with:
-      chalk_on: ${{ (github.event_name == 'workflow_dispatch' && inputs.leg != 'baseline') && 'true' || 'false' }}
+      chalk_on: ${{ inputs.leg == 'instrumented' && 'true' || 'false' }}
       profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
-    if: github.event_name == 'pull_request'
+    if: ${{ 'push' == 'pull_request' }}
   codeql:
     uses: ./.github/workflows/codeql-analysis.yml
     with:
-      chalk_on: ${{ (github.event_name == 'workflow_dispatch' && inputs.leg != 'baseline') && 'true' || 'false' }}
+      chalk_on: ${{ inputs.leg == 'instrumented' && 'true' || 'false' }}
       profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
     permissions:
       contents: read
@@ -698,7 +698,7 @@ jobs:
       contents: read
       id-token: write
     needs: [test_ui, test_go, test_go_more, test_go_oldest_status, golangci, codeql, build_all]
-    if: github.event_name == 'push' && github.event.ref == 'refs/heads/main'
+    if: ${{ 'push' == 'push' && github.event.ref == 'refs/heads/main' }}
     steps:
       - uses: prometheus/promci/publish_main@370e8c15dcec50043cbe66f2f34633d9efc0a190 # v0.9.0
         with:
@@ -716,9 +716,9 @@ jobs:
       id-token: write
     needs: [test_ui, test_go, test_go_more, test_go_oldest_status, golangci, codeql, build_all]
     if: |
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v2.'))
+      ('push' == 'push' && startsWith(github.ref, 'refs/tags/v2.'))
       ||
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v3.'))
+      ('push' == 'push' && startsWith(github.ref, 'refs/tags/v3.'))
     steps:
       - uses: prometheus/promci/publish_release@370e8c15dcec50043cbe66f2f34633d9efc0a190 # v0.9.0
         with:
@@ -770,9 +770,9 @@ jobs:
             ${{ runner.os }}-pnpm-
       - name: Check libraries version
         if: |
-          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v2.'))
+          ('push' == 'push' && startsWith(github.ref, 'refs/tags/v2.'))
           ||
-          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v3.'))
+          ('push' == 'push' && startsWith(github.ref, 'refs/tags/v3.'))
         run: ./scripts/ui_release.sh --check-package "$(./scripts/get_module_version.sh ${GH_REF_NAME})"
         env:
           GH_REF_NAME: ${{ github.ref_name }}
@@ -782,13 +782,13 @@ jobs:
         run: ./scripts/ui_release.sh --copy
       - name: Publish dry-run libraries
         if: |
-          !(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v2.'))
+          !('push' == 'push' && startsWith(github.ref, 'refs/tags/v2.'))
           &&
-          !(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v3.'))
+          !('push' == 'push' && startsWith(github.ref, 'refs/tags/v3.'))
         run: ./scripts/ui_release.sh --publish dry-run
       - name: Publish libraries
         if: |
-          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v2.'))
+          ('push' == 'push' && startsWith(github.ref, 'refs/tags/v2.'))
           ||
-          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v3.'))
+          ('push' == 'push' && startsWith(github.ref, 'refs/tags/v3.'))
         run: ./scripts/ui_release.sh --publish
